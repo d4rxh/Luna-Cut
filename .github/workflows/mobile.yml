@@ -105,6 +105,8 @@ jobs:
     name: Android ${{ matrix.abi }}
     runs-on: ubuntu-24.04
     timeout-minutes: 90
+    permissions:
+      contents: write
     # arm64 is the APK that ships. x86_64 is the same source built for CI's
     # emulators, which run x86_64 and could not start the arm64 one: the
     # launch check below installs it, and it never leaves the run.
@@ -286,7 +288,7 @@ jobs:
 
       - name: Publish Release APK
         if: matrix.ship
-        uses: softprops/action-gh-release@c95fe1489396fe8a9ec87453c663f53724e2330c # v2.2.1
+        uses: softprops/action-gh-release@v2
         with:
           tag_name: v0.2.8
           name: Luna-Cut v0.2.8 (After Effects Mobile UI • GPU Engine)
