@@ -80,7 +80,16 @@ class MainActivity : ComponentActivity() {
         val bench = intent.getBooleanExtra("bench", false)
         val mode = intent.getStringExtra("mode") ?: "vulkan"
         setContent {
-            MaterialTheme(colorScheme = darkColorScheme()) {
+            val lunaColors = darkColorScheme(
+                primary = Color(0xFFD71920), // Luna Crimson
+                onPrimary = Color.White,
+                secondary = Color(0xFF1E1E22),
+                onSecondary = Color(0xFFF5F5F7),
+                background = Color(0xFF000000), // OLED True Black
+                surface = Color(0xFF121214),
+                onSurface = Color(0xFFF5F5F7),
+            )
+            MaterialTheme(colorScheme = lunaColors) {
                 Editor(engine, importPath, bench, mode, ::copyIn)
             }
         }
@@ -121,6 +130,11 @@ private fun Editor(
     var mode by remember { mutableStateOf(initialMode) }
     var message by remember { mutableStateOf("") }
     var scrubbing by remember { mutableStateOf(false) }
+    var keyframes by remember { mutableStateOf(setOf<Double>()) }
+    var scale by remember { mutableStateOf(1.0f) }
+    var rotation by remember { mutableStateOf(0f) }
+    var opacity by remember { mutableStateOf(1.0f) }
+    var showTransform by remember { mutableStateOf(false) }
 
     fun refresh() {
         clips = engine.clips()
@@ -204,14 +218,111 @@ private fun Editor(
             }
         }
 
-        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            Button(onClick = {
-                picker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.VideoOnly))
-            }) { Text("Import") }
-            Button(onClick = { if (playing) engine.pause() else engine.play() }, enabled = duration > 0) {
-                Text(if (playing) "Pause" else "Play")
+        // Header with Luna-Cut Branding & Transport
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween,
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                Text(
+                    "LUNA-CUT",
+                    color = Color(0xFFD71920),
+                    fontSize = 16.sp,
+                    letterSpacing = 2.sp,
+                )
+                Text(
+                    "• ${seconds(position)} / ${seconds(duration)}s",
+                    color = Color(0xFFEEEEEE),
+                    fontSize = 13.sp,
+                )
             }
-            Text("${seconds(position)} / ${seconds(duration)} s", color = Color.White)
+            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                Button(
+                    onClick = {
+                        picker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.VideoOnly))
+                    },
+                ) { Text("+ Media") }
+                Button(
+                    onClick = { if (playing) engine.pause() else engine.play() },
+                    enabled = duration > 0,
+                ) { Text(if (playing) "Pause" else "Play") }
+            }
+        }
+
+        // Keyframe & Transform Bar (After Effects Style)
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            val roundedPos = (Math.round(position * 20.0) / 20.0)
+            val isAtKeyframe = keyframes.any { Math.abs(it - roundedPos) < 0.06 }
+            Button(
+                onClick = {
+                    keyframes = if (isAtKeyframe) {
+                        keyframes.filterNot { Math.abs(it - roundedPos) < 0.06 }.toSet()
+                    } else {
+                        keyframes + roundedPos
+                    }
+                },
+                enabled = duration > 0,
+            ) {
+                Text(if (isAtKeyframe) "◆ Keyframe" else "◇ Add Keyframe")
+            }
+
+            FilterChip(
+                selected = showTransform,
+                onClick = { showTransform = !showTransform },
+                label = { Text("Transform (AE)") },
+            )
+
+            if (keyframes.isNotEmpty()) {
+                Text(
+                    "${keyframes.size} keyframes",
+                    color = Color(0xFFD71920),
+                    fontSize = 12.sp,
+                )
+            }
+        }
+
+        // Transform Controls Card when active
+        if (showTransform) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(Color(0xFF161619))
+                    .padding(8.dp),
+                verticalArrangement = Arrangement.spacedBy(4.dp),
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text("Scale: ${"%.2f".format(scale)}x", color = Color.White, fontSize = 12.sp, modifier = Modifier.width(90.dp))
+                    Slider(
+                        value = scale,
+                        valueRange = 0.5f..2.5f,
+                        onValueChange = { scale = it },
+                        modifier = Modifier.weight(1f),
+                    )
+                }
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text("Rotate: ${rotation.toInt()}°", color = Color.White, fontSize = 12.sp, modifier = Modifier.width(90.dp))
+                    Slider(
+                        value = rotation,
+                        valueRange = -180f..180f,
+                        onValueChange = { rotation = it },
+                        modifier = Modifier.weight(1f),
+                    )
+                }
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text("Opacity: ${(opacity * 100).toInt()}%", color = Color.White, fontSize = 12.sp, modifier = Modifier.width(90.dp))
+                    Slider(
+                        value = opacity,
+                        valueRange = 0f..1f,
+                        onValueChange = { opacity = it },
+                        modifier = Modifier.weight(1f),
+                    )
+                }
+            }
         }
 
         Slider(
@@ -226,7 +337,7 @@ private fun Editor(
             enabled = duration > 0,
         )
 
-        ClipStrip(clips, position, duration) { engine.seek(it) }
+        ClipStrip(clips, position, duration, keyframes) { engine.seek(it) }
 
         Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
             for (option in listOf("vulkan", "gl", "cpu")) {
@@ -249,12 +360,18 @@ private fun Editor(
     }
 }
 
-/** The timeline: one block per clip at 48dp a second, the playhead over it. Tap to seek. */
+/** The timeline: one block per clip at 48dp a second, the playhead and keyframe diamonds over it. Tap to seek. */
 @Composable
-private fun ClipStrip(clips: List<ClipView>, position: Double, duration: Double, seek: (Double) -> Unit) {
+private fun ClipStrip(
+    clips: List<ClipView>,
+    position: Double,
+    duration: Double,
+    keyframes: Set<Double> = emptySet(),
+    seek: (Double) -> Unit,
+) {
     val perSecond = 48.dp
     Box(
-        Modifier.fillMaxWidth().height(56.dp).background(Color(0xFF1C1C1C)).horizontalScroll(rememberScrollState()),
+        Modifier.fillMaxWidth().height(64.dp).background(Color(0xFF0D0D0F)).horizontalScroll(rememberScrollState()),
     ) {
         Box(Modifier.width(perSecond * maxOf(duration.toFloat(), 1f)).fillMaxHeight()) {
             for (clip in clips) {
@@ -262,10 +379,10 @@ private fun ClipStrip(clips: List<ClipView>, position: Double, duration: Double,
                     Modifier
                         .offset(x = perSecond * clip.start.toFloat(), y = (clip.lane.toInt() * 4).dp)
                         .width(perSecond * clip.duration.toFloat())
-                        .height(48.dp)
+                        .height(44.dp)
                         .padding(horizontal = 1.dp)
-                        .background(Color(0xFF2F6FDE))
-                        .border(1.dp, Color(0xFF9CC0FF)),
+                        .background(Color(0xFF1E293B))
+                        .border(1.dp, Color(0xFF3B82F6)),
                 ) {
                     Text(
                         clip.name,
@@ -277,8 +394,23 @@ private fun ClipStrip(clips: List<ClipView>, position: Double, duration: Double,
                     )
                 }
             }
+            // Keyframe diamond markers (◆)
+            for (kf in keyframes) {
+                Box(
+                    Modifier
+                        .offset(x = perSecond * kf.toFloat() - 5.dp, y = 46.dp)
+                        .width(12.dp)
+                        .height(12.dp)
+                ) {
+                    Text(
+                        "◆",
+                        color = Color(0xFFD71920),
+                        fontSize = 11.sp,
+                    )
+                }
+            }
             Spacer(
-                Modifier.offset(x = perSecond * position.toFloat()).width(2.dp).fillMaxHeight().background(Color.White),
+                Modifier.offset(x = perSecond * position.toFloat()).width(2.dp).fillMaxHeight().background(Color(0xFFD71920)),
             )
         }
     }

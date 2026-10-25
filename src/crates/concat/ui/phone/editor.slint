@@ -693,6 +693,28 @@ export component PhoneEditor inherits Rectangle {
             label: I18n.t("previewPane.nextFrame");
             clicked => { Editor.step-frames(1); }
         }
+
+        // AE-style Keyframe Diamond Button on Transport Bar
+        if root.has-clip: RoundButton {
+            x: play.x + play.width + 40px;
+            y: (parent.height - self.height) / 2;
+            size: 36px;
+            icon-size: 16px;
+            glyph: Glyph.keyframe;
+            label: "Keyframe";
+            clicked => { Editor.shortcut("toggle-keyframe"); }
+        }
+
+        // AE-style Graph / Curve Editor Button on Transport Bar
+        if root.has-clip: RoundButton {
+            x: play.x + play.width + 78px;
+            y: (parent.height - self.height) / 2;
+            size: 36px;
+            icon-size: 16px;
+            glyph: Glyph.curves;
+            label: "Curves";
+            clicked => { root.show("clip-speed", true); }
+        }
     }
 
     // ── the lanes ────────────────────────────────────────────────────
@@ -956,6 +978,17 @@ export component PhoneEditor inherits Rectangle {
                 glyph: Glyph.split;
                 label: I18n.t("phone.split");
                 clicked => { Editor.shortcut("split-selected"); }
+            }
+            ToolItem {
+                glyph: Glyph.keyframe;
+                label: "Keyframe";
+                clicked => { Editor.shortcut("toggle-keyframe"); }
+            }
+            ToolItem {
+                glyph: Glyph.curves;
+                label: "Graph";
+                current: root.sheet == "clip-speed";
+                clicked => { root.show("clip-speed", true); }
             }
             ToolItem {
                 glyph: Glyph.trash;

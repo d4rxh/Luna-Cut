@@ -1,9 +1,12 @@
 <p align="center">
-  <h1 align="center">🎬 Luna-Cut</h1>
-  <p align="center">
-    <strong>The Free, Open-Source, GPU-Accelerated Video & Motion Editor</strong><br>
-    <em>Local-first • Keyframe Bezier Curves • Multi-Track Timeline • Zero Watermark • 100% Private</em>
-  </p>
+  <img src="assets/luna-cut-logo.png" alt="Luna-Cut Logo" width="160" style="border-radius: 28px;" />
+</p>
+
+<h1 align="center">Luna-Cut</h1>
+
+<p align="center">
+  <strong>The Free, Open-Source, GPU-Accelerated Video & Motion Editor</strong><br>
+  <em>Local-first • Keyframe Bezier Curves • Multi-Track Timeline • Zero Watermark • 100% Private</em>
 </p>
 
 <p align="center">
@@ -16,7 +19,7 @@
 
 ## 🌟 What is Luna-Cut?
 
-**Luna-Cut** is a next-generation, local-first motion and video editor built with a native Rust GPU engine (Vulkan / OpenGL / Skia) and a modern OLED-optimized mobile interface.
+**Luna-Cut** is a next-generation, local-first motion and video editor built with a native Rust GPU engine (Vulkan / OpenGL / Skia) and a modern OLED-optimized mobile interface inspired by professional motion design workflows.
 
 Designed as a privacy-friendly, pro-grade alternative to subscription-based editors (like CapCut & Alight Motion), **Luna-Cut** runs entirely on your device with no cloud uploads, no watermarks, and no mandatory accounts.
 
