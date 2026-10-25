@@ -5,18 +5,17 @@ plugins {
 }
 
 android {
-    namespace = "app.concat.editor.spike"
+    namespace = "com.d4rxh.lunacut"
     compileSdk = 35
     // The NDK the engine is built with; AGP strips the .so's symbols with it.
     ndkVersion = "28.2.13676358"
 
     defaultConfig {
-        // Never app.concat.editor: this installs beside the shipping app.
-        applicationId = "app.concat.editor.spike"
+        applicationId = "com.d4rxh.lunacut"
         minSdk = 26
         targetSdk = 35
         versionCode = 1
-        versionName = "0.0.1-spike"
+        versionName = "1.0.0"
         ndk { abiFilters += "arm64-v8a" }
     }
 

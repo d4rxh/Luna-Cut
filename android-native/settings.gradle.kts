@@ -15,5 +15,5 @@ dependencyResolutionManagement {
         mavenCentral()
     }
 }
-rootProject.name = "concat-spike"
+rootProject.name = "luna-cut"
 include(":app")
