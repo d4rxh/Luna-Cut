@@ -184,12 +184,9 @@ jobs:
       - name: A key for the run
         run: |
           set -euo pipefail
-          keystore=$RUNNER_TEMP/run.keystore
-          keytool -genkeypair -v -keystore "$keystore" -storepass concat -keypass concat \
-            -alias concat -keyalg RSA -keysize 2048 -validity 10000 \
-            -dname "CN=Concat, O=Concat" >/dev/null 2>&1
+          keystore="$GITHUB_WORKSPACE/keystore/release.keystore"
           echo "CARGO_APK_RELEASE_KEYSTORE=$keystore" >> "$GITHUB_ENV"
-          echo "CARGO_APK_RELEASE_KEYSTORE_PASSWORD=concat" >> "$GITHUB_ENV"
+          echo "CARGO_APK_RELEASE_KEYSTORE_PASSWORD=lunacutrelease" >> "$GITHUB_ENV"
 
       # The build environment first, then the build under it.
       - name: Build the APK
@@ -212,40 +209,45 @@ jobs:
       # keytool lists), and the key's password (ANDROID_KEY_PASSWORD, or
       # the keystore's, which is what a key made with the keystore has).
       # A prompt on a runner is a step that waits for its timeout.
-      - name: Sign with the repository's key
-        if: inputs.sign && matrix.ship
+      - name: Sign APK with apksigner (v1, v2, v3 schemes)
+        if: matrix.ship
         timeout-minutes: 10
-        env:
-          KEYSTORE_B64: ${{ secrets.ANDROID_KEYSTORE }}
-          KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
-          KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
-          KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD || secrets.ANDROID_KEYSTORE_PASSWORD }}
         run: |
           set -euo pipefail
-          if [ -z "$KEYSTORE_B64" ]; then
-            echo "::warning::ANDROID_KEYSTORE is not set; the APK keeps the key made for this run"
-            exit 0
-          fi
-          keystore=$RUNNER_TEMP/release.keystore
-          echo "$KEYSTORE_B64" | base64 --decode > "$keystore"
-          alias=$KEY_ALIAS
-          if [ -z "$alias" ]; then
-            alias=$(keytool -list -keystore "$keystore" -storepass:env KEYSTORE_PASSWORD 2>/dev/null \
-              | awk -F, '/PrivateKeyEntry/ { print $1; exit }')
-            if [ -z "$alias" ]; then
-              rm -f "$keystore"
-              echo "::error::the keystore holds no private key, or its password is wrong; set ANDROID_KEY_ALIAS"
-              exit 1
-            fi
-            echo "ANDROID_KEY_ALIAS is not set; signing with the keystore's first key, $alias"
-          fi
           sdk=${ANDROID_HOME:-$ANDROID_SDK_ROOT}
           tools=$(find "$sdk/build-tools" -mindepth 1 -maxdepth 1 -type d | sort -V | tail -1)
           apk=$(ls src/target/release/apk/*.apk | head -1)
-          "$tools/apksigner" sign --ks "$keystore" --ks-pass env:KEYSTORE_PASSWORD \
-            --ks-key-alias "$alias" --key-pass env:KEY_PASSWORD "$apk" < /dev/null
-          rm -f "$keystore"
-          "$tools/apksigner" verify --print-certs "$apk"
+
+          keystore="$GITHUB_WORKSPACE/keystore/release.keystore"
+          storepass="lunacutrelease"
+          alias="lunacut"
+          keypass="lunacutrelease"
+
+          if [ -n "${{ secrets.ANDROID_KEYSTORE }}" ]; then
+            keystore="$RUNNER_TEMP/secret.keystore"
+            echo "${{ secrets.ANDROID_KEYSTORE }}" | base64 --decode > "$keystore"
+            storepass="${{ secrets.ANDROID_KEYSTORE_PASSWORD }}"
+            alias="${{ secrets.ANDROID_KEY_ALIAS || 'lunacut' }}"
+            keypass="${{ secrets.ANDROID_KEY_PASSWORD || secrets.ANDROID_KEYSTORE_PASSWORD }}"
+          fi
+
+          echo "Running zipalign on $apk..."
+          aligned="${apk%.apk}-aligned.apk"
+          "$tools/zipalign" -v -p -f 4 "$apk" "$aligned"
+          mv "$aligned" "$apk"
+
+          echo "Signing $apk with apksigner (v1, v2, v3)..."
+          "$tools/apksigner" sign --ks "$keystore" \
+            --ks-pass "pass:$storepass" \
+            --ks-key-alias "$alias" \
+            --key-pass "pass:$keypass" \
+            --v1-signing-enabled true \
+            --v2-signing-enabled true \
+            --v3-signing-enabled true \
+            "$apk"
+
+          echo "Verifying APK signature..."
+          "$tools/apksigner" verify --verbose --print-certs "$apk"
 
       # A phone with 16 KB pages loads none of a library aligned to less,
       # and the build would not say so.

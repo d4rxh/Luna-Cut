@@ -71,6 +71,7 @@ icon = "@mipmap/ic_launcher"
 # mode switching on (at sunset, too), split screen, a larger font or
 # display size, a new language, a keyboard plugged in.
 [package.metadata.android.application.activity]
+exported = true
 config_changes = "orientation|keyboardHidden|keyboard|navigation|screenSize|smallestScreenSize|screenLayout|uiMode|density|fontScale|fontWeightAdjustment|locale|layoutDirection"
 launch_mode = "singleTop"
 # Upright only. The phone shell is drawn for a screen held upright - the
